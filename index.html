@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Anime Recommender</title>
+    <style>
+        /* --- Basic Styling --- */
+        :root {
+            --primary-color: #4a4e69;
+            --secondary-color: #9a8c98;
+            --background-color: #f2e9e4;
+            --card-background: #ffffff;
+            --font-color: #22223b;
+            --accent-color: #c9ada7;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--background-color);
+            color: var(--font-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background-color: var(--card-background);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        /* --- API Key Section --- */
+        .api-key-section {
+            background-color: #fff0f0;
+            border: 1px solid #ffb3b3;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .api-key-section label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        #apiKeyInput {
+            width: 90%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        /* --- Quiz Form --- */
+        .quiz-form .question-group {
+            margin-bottom: 20px;
+        }
+
+        .quiz-form label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--primary-color);
+        }
+
+        .quiz-form textarea {
+            width: 100%;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-size: 1rem;
+            min-height: 80px;
+            box-sizing: border-box; /* Important for width */
+            resize: vertical;
+        }
+
+        .quiz-form button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .quiz-form button:hover {
+            background-color: var(--secondary-color);
+        }
+
+        /* --- Loading and Results --- */
+        #loader {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2rem;
+            color: var(--primary-color);
+        }
+
+        #recommendationResult {
+            margin-top: 30px;
+        }
+
+        .anime-card {
+            display: flex;
+            background-color: #fdfdfd;
+            border: 1px solid #eee;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            gap: 20px;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .anime-card img {
+            width: 120px;
+            height: 180px;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+
+        .anime-card-content h3 {
+            margin: 0 0 10px 0;
+            color: var(--primary-color);
+        }
+        
+        .anime-card-content p {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin: 0;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 600px) {
+            .anime-card {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>AI Anime Recommender</h1>
+
+        <div class="api-key-section">
+            <label for="apiKeyInput">⚠️ Enter Your Google Gemini API Key</label>
+            <input type="password" id="apiKeyInput" placeholder="Paste your secret API key here">
+            <p style="font-size: 0.8rem; color: #666; margin-top: 10px;">Your key is used only in your browser and is never sent to any server but Google's.</p>
+        </div>
+
+        <form id="quizForm" class="quiz-form">
+            <div class="question-group">
+                <label for="q1">What genres are you in the mood for? (e.g., action, mystery, slice of life, sci-fi)</label>
+                <textarea id="q1" name="q1" required></textarea>
+            </div>
+            <div class="question-group">
+                <label for="q2">Describe a show (anime or not) that you recently loved and explain why.</label>
+                <textarea id="q2" name="q2" required></textarea>
+            </div>
+            <div class="question-group">
+                <label for="q3">What kind of main character do you enjoy watching? (e.g., clever, overpowered, underdog)</label>
+                <textarea id="q3" name="q3" required></textarea>
+            </div>
+            <button type="submit">Get My Recommendations</button>
+        </form>
+
+        <div id="loader">Generating recommendations...</div>
+        <div id="recommendationResult"></div>
+    </div>
+
+    <script>
+        const quizForm = document.getElementById('quizForm');
+        const loader = document.getElementById('loader');
+        const recommendationResult = document.getElementById('recommendationResult');
+        const apiKeyInput = document.getElementById('apiKeyInput');
+
+        // Main event listener for the form submission
+        quizForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const geminiApiKey = apiKeyInput.value.trim();
+            if (!geminiApiKey) {
+                alert('Please enter your Gemini API key before getting recommendations.');
+                return;
+            }
+
+            // 1. Collect answers from the form
+            const answers = {
+                q1: document.getElementById('q1').value,
+                q2: document.getElementById('q2').value,
+                q3: document.getElementById('q3').value,
+            };
+
+            // 2. Show loader and clear previous results
+            loader.style.display = 'block';
+            recommendationResult.innerHTML = '';
+
+            try {
+                // 3. Construct a detailed prompt for Gemini
+                const prompt = `
+                    Based on the following user preferences, suggest exactly 3 anime titles.
+                    
+                    User Preferences:
+                    - Desired Genres: "${answers.q1}"
+                    - A show they liked and why: "${answers.q2}"
+                    - Preferred Main Character type: "${answers.q3}"
+
+                    Your task is to analyze these preferences and return the three best-fitting anime titles.
+                    IMPORTANT: Respond ONLY with a valid JSON array of strings, where each string is an anime title. Do not include any other text, explanations, or markdown.
+                    For example: ["Fullmetal Alchemist: Brotherhood", "Steins;Gate", "Mushishi"]
+                `;
+
+                // 4. Call Gemini AI to get titles
+                const geminiResponse = await callGeminiAPI(prompt, geminiApiKey);
+                
+                // Clean the response to ensure it's valid JSON
+                const cleanedJsonString = geminiResponse.replace(/```json\n|```/g, '').trim();
+                const titles = JSON.parse(cleanedJsonString);
+
+                if (!Array.isArray(titles) || titles.length === 0) {
+                   throw new Error("AI did not return a valid list of titles.");
+                }
+
+                // 5. Fetch details for each title from the Jikan API and display them
+                for (const title of titles) {
+                    const animeData = await fetchAnimeDetails(title);
+                    if (animeData) {
+                        displayAnimeCard(animeData);
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                recommendationResult.innerHTML = `<p style="color: red; text-align: center;">Something went wrong. Please check the console for details. Common issues are an invalid API key or a network problem.</p>`;
+            } finally {
+                // 6. Hide loader
+                loader.style.display = 'none';
+            }
+        });
+
+        // Function to call the Gemini API
+        async function callGeminiAPI(promptText, apiKey) {
+            const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            
+            const response = await fetch(GEMINI_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: promptText }] }]
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`Gemini API Error: ${errorData.error.message}`);
+            }
+
+            const data = await response.json();
+            return data.candidates[0].content.parts[0].text;
+        }
+
+        // Function to fetch anime data from Jikan API
+        async function fetchAnimeDetails(title) {
+            const JIKAN_API_URL = `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(title)}&limit=1`;
+            try {
+                const response = await fetch(JIKAN_API_URL);
+                const data = await response.json();
+                return data.data.length > 0 ? data.data[0] : null;
+            } catch (error) {
+                console.error(`Failed to fetch details for ${title}:`, error);
+                return null;
+            }
+        }
+
+        // Function to create and display an anime recommendation card
+        function displayAnimeCard(anime) {
+            const card = document.createElement('div');
+            card.className = 'anime-card';
+
+            const imageUrl = anime.images?.jpg?.image_url || 'https://via.placeholder.com/120x180?text=No+Image';
+            const synopsis = anime.synopsis ? anime.synopsis.substring(0, 250) + '...' : 'No synopsis available.';
+
+            card.innerHTML = `
+                <img src="${imageUrl}" alt="${anime.title}">
+                <div class="anime-card-content">
+                    <h3>${anime.title}</h3>
+                    <p>${synopsis}</p>
+                </div>
+            `;
+            recommendationResult.appendChild(card);
+        }
+    </script>
+
+</body>
+</html>
